@@ -1,0 +1,63 @@
+{
+
+	Question: "What is good law?";
+	Answer: "Uniform, Certain, Felxible, Fair, Accessible";
+	level: 0;
+	date: 1583117168;
+}
+
+{
+
+	Question: "What is the purpose of law?";
+	Answer: "1.To ensure that society as a whole behaves in an orderly & resonable way.
+	2. To balance the need of the individual & the collective.";
+	level: 1;
+	date: 1583117173;
+}
+
+{
+
+	Question: "What is jurisdication";
+	Answer: "The extent of power to make & enforce legal decisions";
+	level: 0;
+	date: 1583117175;
+}
+
+{
+
+	Question: "What are the categories of jurisdication?";
+	Answer: "1.National vs International law
+	2. State vs Federal Law
+	3. Hierachy of courts";
+	level: 0;
+	date: 1583117164;
+}
+
+{
+
+	Question: "What are the categories of domestic Law?";
+	Answer: "1.Criminal
+	2.Civil
+	3.Constitutional
+	4.Regulatory";
+	level: 0;
+	date: 1583117164;
+}
+
+{
+
+	Question: "What are the categories of International Law?";
+	Answer: "1.Private
+	2.Public";
+	level: 0;
+	date: 1583117164;
+}
+
+{
+
+	Question: "What are the Families of Law?";
+	Answer: "";
+	level: 0;
+	date: 1583117164;
+}
+
