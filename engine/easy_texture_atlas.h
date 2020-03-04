@@ -167,8 +167,24 @@ static inline bool easyAtlas_allElmsBeenAdded(InfiniteAlloc *atlasElms) {
 	return result;
 }
 
-static inline void easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, InfiniteAlloc *atlasElms, bool outputImageFile, char *name, int EASY_ATLAS_PADDING) {
+//NOTE(ollie): Go through and set all elements to 'not' been added
+static inline void easyAtlas_refreshAllElements(InfiniteAlloc *atlasElms) {
+	for(int index = 0; index < atlasElms->count; ++index) {
+		Easy_AtlasElm *atlasElm = (Easy_AtlasElm *)getElementFromAlloc_(atlasElms, index);
+		atlasElm->added = false;
+	}
+}
+
+typedef struct {
+	u32 count;
+	Rect2f dimensions[128];
+} EasyAtlas_Dimensions;
+
+static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, InfiniteAlloc *atlasElms, bool outputImageFile, char *name, int EASY_ATLAS_PADDING, int sizeX, int sizeY) {
     
+    EasyAtlas_Dimensions result = {};
+;
+
 	MemoryArenaMark tempMark = takeMemoryMark(memoryArena);
 	
 	EasyAtlas_BinState state = {};
@@ -180,20 +196,22 @@ static inline void easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, Inf
 	int loopCount = 0;
 	while(!easyAtlas_allElmsBeenAdded(atlasElms)) {
 		loopCount++;
-		//get the width of the tex atlas
-		int maxSize;
-		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
-		int size = 4096;
-		if(size > maxSize) {
-			size = maxSize;
-		}
         
-		V2 bufferDim = v2(size, size);
-		FrameBuffer atlasBuffer = createFrameBuffer(bufferDim.x, bufferDim.y, FRAMEBUFFER_COLOR, 1);
-		initRenderGroup(globalRenderGroup);
-		clearBufferAndBind(atlasBuffer.bufferId, COLOR_NULL, atlasBuffer.flags, globalRenderGroup);
-		setFrameBufferId(globalRenderGroup, atlasBuffer.bufferId);
-        
+		V2 bufferDim = v2(sizeX, sizeY);
+
+		//NOTE(ollie): Add new dimension to the dimensions
+		assert(result.count < arrayCount(result.dimensions));
+		result.count++;
+
+		FrameBuffer atlasBuffer = {};
+		if(outputImageFile) {
+			atlasBuffer = createFrameBuffer(bufferDim.x, bufferDim.y, FRAMEBUFFER_COLOR, 1);
+			// initRenderGroup(globalRenderGroup);
+			clearBufferAndBind(atlasBuffer.bufferId, COLOR_NULL, atlasBuffer.flags, globalRenderGroup);
+			setFrameBufferId(globalRenderGroup, atlasBuffer.bufferId);
+			 setBlendFuncType(globalRenderGroup, BLEND_FUNC_STANDARD_PREMULTIPLED_ALPHA);
+        }
+
 		//draw all the rects into the frame buffer
 		easyAtlas_addBin(rect2f(0, 0, bufferDim.x, bufferDim.y), &state);
         
@@ -211,35 +229,41 @@ static inline void easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, Inf
 						atlasElm->added = true;
                         	
 						Rect2f texAsRect = rect2f(bin->rect.minX + 0.5f*EASY_ATLAS_PADDING, bin->rect.minY + 0.5f*EASY_ATLAS_PADDING, bin->rect.minX + texOnStack.width, bin->rect.minY + texOnStack.height);
-						renderTextureCentreDim(&texOnStack, v2ToV3(getCenter(texAsRect), -1), getDim(texAsRect), COLOR_WHITE, 0, mat4(), mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y));
-						// renderDrawRectOutlineCenterDim_(v2ToV3(getCenter(bin->rect), -0.5f), getDim(bin->rect), COLOR_RED, 0, mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y), 4); 
-                        
-						texOnStack.uvCoords = rect2f(texAsRect.minX / bufferDim.x, texAsRect.minY / bufferDim.y, texAsRect.maxX / bufferDim.x, texAsRect.maxY / bufferDim.y);
-					    assert(atlasBuffer.colorBufferCount != 0);
-					    texOnStack.id = atlasBuffer.textureIds[0];
-					    
-                        
-					    char *startBr = "{";
-						addElementInifinteAllocWithCount_(&fileMemoryToWrite, startBr, 1); 
-                        
-					    addVar(&fileMemoryToWrite, &texOnStack.width, "width", VAR_INT);
-					    addVar(&fileMemoryToWrite, &texOnStack.height, "height", VAR_INT);
-					    addVar(&fileMemoryToWrite, texOnStack.uvCoords.E, "uvCoords", VAR_V4);
-					    addVar(&fileMemoryToWrite, atlasElm->shortName, "name", VAR_CHAR_STAR);
-                        
-					    char *endBr = "}";
-					    addElementInifinteAllocWithCount_(&fileMemoryToWrite, endBr, 1); 
-                        
-					    Texture *tex = (Texture *)calloc(sizeof(Texture), 1);
-					    memcpy(tex, &texOnStack, sizeof(Texture));
-					    Asset *result = addAssetTexture(atlasElm->shortName, tex);
-                        
-					    free(atlasElm->shortName);
-                        
+						
+						Rect2f resultDim = result.dimensions[result.count - 1];
+
+						//NOTE(ollie): Absorb the new rectangle
+						resultDim = unionRect2f(resultDim, texAsRect);
+						result.dimensions[result.count - 1] = resultDim;
+
+						if(outputImageFile) {
+							renderTextureCentreDim(&texOnStack, v2ToV3(getCenter(texAsRect), NEAR_CLIP_PLANE), getDim(texAsRect), COLOR_WHITE, 0, mat4(), mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y));
+							// renderDrawRectOutlineCenterDim_(v2ToV3(getCenter(bin->rect), -0.5f), getDim(bin->rect), COLOR_RED, 0, mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y), 4); 
+	                        
+							texOnStack.uvCoords = rect2f(texAsRect.minX / bufferDim.x, texAsRect.minY / bufferDim.y, texAsRect.maxX / bufferDim.x, texAsRect.maxY / bufferDim.y);
+						    assert(atlasBuffer.colorBufferCount != 0);
+						    texOnStack.id = atlasBuffer.textureIds[0];
+						    
+	                        
+						    char *startBr = "{";
+							addElementInifinteAllocWithCount_(&fileMemoryToWrite, startBr, 1); 
+	                        
+						    addVar(&fileMemoryToWrite, &texOnStack.width, "width", VAR_INT);
+						    addVar(&fileMemoryToWrite, &texOnStack.height, "height", VAR_INT);
+						    addVar(&fileMemoryToWrite, texOnStack.uvCoords.E, "uvCoords", VAR_V4);
+						    addVar(&fileMemoryToWrite, atlasElm->shortName, "name", VAR_CHAR_STAR);
+	                        
+						    char *endBr = "}";
+						    addElementInifinteAllocWithCount_(&fileMemoryToWrite, endBr, 1); 
+	                        
+						    Texture *tex = (Texture *)calloc(sizeof(Texture), 1);
+						    memcpy(tex, &texOnStack, sizeof(Texture));
+						    Asset *result = addAssetTexture(atlasElm->shortName, tex);
+                        }
 					    easyAtlas_partitionBin(&state, bin, &texOnStack, EASY_ATLAS_PADDING);
 					} else {
-						//make sure the texture can at least fit on a big size. 
-						assert(texOnStack.width + EASY_ATLAS_PADDING < size && texOnStack.height + EASY_ATLAS_PADDING < size);
+						//make sure the texture can at least fit on the biggest size. 
+						assert(texOnStack.width + EASY_ATLAS_PADDING < sizeX && texOnStack.height + EASY_ATLAS_PADDING < sizeY);
 					}
 				} else {
 					printf("%s\n", "no more bins");
@@ -248,24 +272,23 @@ static inline void easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, Inf
 			} 
 		}
         
-		renderSetViewPort(0, 0, bufferDim.x, bufferDim.y);
-		drawRenderGroup(globalRenderGroup, RENDER_DRAW_DEFAULT);
-        
-		glFlush();
-		printf("%s\n", "successfullly rendered group");
-        
-		char buffer[512] = {};
-		sprintf(buffer, "%s%s_%d.txt", folderName, name, loopCount);
-		printf("%s\n", buffer);
-		game_file_handle fileHandle = platformBeginFileWrite(buffer);
-        
-		platformWriteFile(&fileHandle, fileMemoryToWrite.memory, fileMemoryToWrite.sizeOfMember*fileMemoryToWrite.count, 0);
-        
-		platformEndFile(fileHandle);
-        
-		printf("%s\n", "wrote file");
-        
-		if(outputImageFile) {
+        if(outputImageFile) {
+			renderSetViewPort(0, 0, bufferDim.x, bufferDim.y);
+			drawRenderGroup(globalRenderGroup, RENDER_DRAW_DEFAULT);
+	        
+			glFlush();
+			printf("%s\n", "successfullly rendered group");
+	        
+			char buffer[512] = {};
+			sprintf(buffer, "%s%s_%d.txt", folderName, name, loopCount);
+			printf("%s\n", buffer);
+			game_file_handle fileHandle = platformBeginFileWrite(buffer);
+	        
+			platformWriteFile(&fileHandle, fileMemoryToWrite.memory, fileMemoryToWrite.sizeOfMember*fileMemoryToWrite.count, 0);
+	        
+			platformEndFile(fileHandle);
+	        
+			printf("%s\n", "wrote file");
             
 			char buffer1[512] = {};
 			sprintf(buffer1, "%s%s_%d.png", folderName, name, loopCount);
@@ -293,6 +316,8 @@ static inline void easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, Inf
 	}
     
 	releaseMemoryMark(&tempMark);
+
+	return result;
 }
 
 static inline void easyAtlas_loadTextureAtlas(char *fileName, RenderTextureFilter filter) {
@@ -393,7 +418,7 @@ static inline void easyAtlas_createTextureAtlas(char *idName, char *folderName, 
 	easyAtlas_sortBySize(&atlasElms);
 	stbi_flip_vertically_on_write(true);//flip bytes vertically
     
-	easyAtlas_drawAtlas(ouputFolderName, memoryArena, &atlasElms, true, idName, padding);
+	easyAtlas_drawAtlas(ouputFolderName, memoryArena, &atlasElms, true, idName, padding, 4096, 4096);
     
 	releaseInfiniteAlloc(&atlasElms);
     

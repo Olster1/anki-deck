@@ -17,7 +17,7 @@
 #define DEFINES_AUDIO_SAMPLE_RATE 44100
 
 #if DEVELOPER_MODE
-#define RESOURCE_PATH_EXTENSION "res/" 
+#define RESOURCE_PATH_EXTENSION "../res/" 
 #else 
 #define RESOURCE_PATH_EXTENSION "res/"
 #define NDEBUG

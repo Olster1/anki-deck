@@ -276,6 +276,9 @@ int main(int argc, char *args[]) {
         Font mainFont = initFont(fontName, 88);
         Font smallMainFont = initFont(fontName, 52);
         
+        easyFont_createSDFFont(concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena));
+        
+        // exit(0);
         char *fontName1 = concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena);
         
         //Set the debug font 

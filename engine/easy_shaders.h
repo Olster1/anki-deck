@@ -24,6 +24,7 @@ static char *fragment_shader_texture_shader = "uniform sampler2D tex;\n"
 "\n"
 "}";
 
+
 static char *frag_blur_shader = "out vec4 FragColor;\n"
 "\n"
 "out vec4 BrightColor;\n"
@@ -536,6 +537,21 @@ static char *frag_model_shader = "struct Material {\n"
 "\n"
 "        BrightColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
 "\n"
+"}";
+
+
+static char *frag_font_shader = "uniform sampler2D tex;"
+"in vec4 colorOut;"
+"in vec2 texUV_out;"
+"out vec4 color;"
+"float smoothing = 0.1f;"
+"void main (void) {"
+	"vec4 texColor = texture(tex, texUV_out);"
+	"float alpha = texColor.w;"
+	"if(alpha == 0) discard; "
+	"vec4 c = colorOut;"
+	"c.w = 1.0f - smoothstep(0.5f - smoothing, 0.5f + smoothing, alpha);"
+"    color = c;"
 "}";
 
 static char *frag_skybox_shader = "out vec4 FragColor;\n"

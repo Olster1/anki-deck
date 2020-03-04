@@ -5,8 +5,108 @@ File to enable writing with fonts easy to add to your project. Uses Sean Barret'
 #define STB_TRUETYPE_IMPLEMENTATION 
 #include "stb_truetype.h"
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+static void easyFont_createSDFFont(char *fileName) {
+    FileContents contents = platformReadEntireFile(fileName, false);
+
+    //NOTE(ollie): This stores all the info about the font
+    stbtt_fontinfo *fontInfo = pushStruct(&globalLongTermArena, stbtt_fontinfo);
+
+    //NOTE(ollie): Fill out the font info
+    stbtt_InitFont(fontInfo, contents.memory, 0);
+
+    //NOTE(ollie): Get the 'scale' for the max pixel height 
+    float maxHeightForFontInPixels = 15;//pixels
+    float scale = stbtt_ScaleForPixelHeight(fontInfo, maxHeightForFontInPixels);
+
+    //NOTE(ollie): Scale the padding around the glyph proportional to the size of the glyph
+    s32 padding = (s32)(maxHeightForFontInPixels / 3);
+    //NOTE(ollie): The distance from the glyph center that determines the edge (i.e. all the 'in' pixels)
+    u8 onedge_value = (u8)(0.5f*255); 
+    //NOTE(ollie): The rate at which the distance from the center should increase
+    float pixel_dist_scale = (float)onedge_value/(float)padding;
+
+    int firstChar = 'A';
+    int endChar = 'z';
+
+    InfiniteAlloc atlasElms = initInfinteAlloc(Easy_AtlasElm);
+
+    for(int codeIndex = firstChar; codeIndex <= endChar; ++codeIndex) {
+        
+        int width;
+        int height;
+        int xoffset; 
+        int yoffset;
+
+        u8 *sdfBitmap = stbtt_GetCodepointSDF(fontInfo, scale, codeIndex, padding, onedge_value, pixel_dist_scale, &width, &height, &xoffset, &yoffset);    
+        
+        // u8 *sdfBitmap_32 = 
+
+        char nameBuf[4096] = {};
+        sprintf(nameBuf, "mono_%d", codeIndex);
+
+        Easy_AtlasElm elm = {};
+        elm.shortName = nameBuf;
+
+        elm.tex = {};
+        elm.tex.width = width;
+        elm.tex.height = height;
+        elm.tex.aspectRatio_h_over_w = height / width;
+        elm.tex.uvCoords = rect2f(0, 0, 1, 1);
+
+        u32 *sdfBitmap_32 = (u32 *)pushSize(&globalPerFrameArena, width*height*sizeof(u32));
+        for(int y = 0; y < height; ++y) {
+            for(int x = 0; x < width; ++x) {
+                u8 alpha = sdfBitmap[y*width + x];
+                if(alpha != 0) {
+                    int j = 0;
+                }
+                sdfBitmap_32[y*width + x] = 0x00000000 | (u32)(((u32)alpha) << 24);
+            }
+        }
+        elm.tex.id = renderLoadTexture(width, height, sdfBitmap_32, RENDER_TEXTURE_DEFAULT);
+
+        addElementInifinteAllocWithCount_(&atlasElms, &elm, 1);
+
+        stbtt_FreeSDF(sdfBitmap, 0);
+    }
+
+    easyAtlas_sortBySize(&atlasElms);
+
+
+    //NOTE(ollie): Starting dimensions
+    EasyAtlas_Dimensions dimensions = {};
+    float rectX = 256;
+    float rectY = 256;
+
+    float increment = 32;
+
+    char *outputFileName = concatInArena(globalExeBasePath, "./fontBitmaps.png", &globalPerFrameArena);
+
+    // NOTE(ollie): Try find the smallest size to fint everyone in
+    do {
+        dimensions = easyAtlas_drawAtlas(outputFileName, &globalPerFrameArena, &atlasElms, false, "mono-font", 5, rectX, rectY);
+        easyAtlas_refreshAllElements(&atlasElms);
+        rectX -= increment;
+        rectY -= increment;
+    } while(dimensions.count == 1);
+    
+    rectX += 2*increment;
+    rectY += 2*increment;
+
+    easyAtlas_refreshAllElements(&atlasElms);
+    //NOTE(ollie): Actually draw the atlas to disk now
+    easyAtlas_drawAtlas(outputFileName, &globalPerFrameArena, &atlasElms, true, "font_itmap_mono-font", 5, rectX, rectY);
+
+    //NOTE(ollie): Release the memory were using
+    releaseInfiniteAlloc(&atlasElms);
+    
+    /*
+    Bitmap functions
+
+    stbtt_MakeCodepointBitmap()         
+    stbtt_GetCodepointBitmapBox()
+    */
+}
 
 
 //TODO API: 

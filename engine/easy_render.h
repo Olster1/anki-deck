@@ -114,6 +114,7 @@ RenderProgram blurProgram;
 RenderProgram colorWheelProgram;
 RenderProgram circleProgram;
 RenderProgram model3dTo2dImageProgram;
+RenderProgram fontProgram;
 
 
 typedef struct {
@@ -1595,7 +1596,9 @@ void enableRenderer(int width, int height, Arena *arena) {
 
     model3dTo2dImageProgram = createProgramFromFile(vertex_model_as_2d_image_shader, frag_model_shader, false);
     renderCheckError();
-    
+        
+    fontProgram = createProgramFromFile(vertex_shader_tex_attrib_shader, frag_font_shader, false);
+    renderCheckError();
     
 #endif
 
@@ -1617,8 +1620,9 @@ static inline V4 hexARGBTo01Color(unsigned int color) {
 }
 
 typedef enum {
-    RENDER_TEXTURE_DEFAULT,
-    RENDER_TEXTURE_HDR,
+    RENDER_TEXTURE_DEFAULT = 0 << 0,
+    RENDER_TEXTURE_HDR = 1 << 0,
+    RENDER_TEXTURE_ONE_CHANNEL = 1 << 1,
 } RenderTextureFlag;
 
 
@@ -1650,8 +1654,15 @@ GLuint renderLoadTexture(int width, int height, void *imageData, RenderTextureFl
         internalFormat = GL_RGBA16F; //NOTE: Out HDR buffer
     } 
 
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, GL_RGBA, pixelType, imageData);
-    renderCheckError();
+    if(flags & RENDER_TEXTURE_ONE_CHANNEL) {
+        // GL_RED
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, GL_ALPHA, pixelType, imageData);
+        renderCheckError();
+    } else {
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, GL_RGBA, pixelType, imageData);
+        renderCheckError();
+    }
+    
     
     glBindTexture(GL_TEXTURE_2D, 0);
     renderCheckError();
