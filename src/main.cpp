@@ -211,7 +211,7 @@ static void updateCard(AnkiDeck *deck, AnkiCard *card, AnkiResult result) {
     saveAnkiDeck(deck);
 }
 
-static void drawStringInMiddle(Font *font, char *string, V2 resolution, float screenRelativeSize) {
+static void drawStringInMiddle(EasyFont_Font *font, char *string, V2 resolution, float screenRelativeSize) {
     Rect2f m = rect2fMinDim(0.15f*resolution.x, 0.15f*resolution.y, 0.7f*resolution.x, 0.7f*resolution.y);
     V2 bounds = getBounds(string, m, font, 1, resolution, screenRelativeSize);
     m = rect2fMinDim(0.5f*resolution.x - 0.5f*bounds.x, 0.5f*resolution.y - 0.5f*bounds.y - font->fontHeight, bounds.x, bounds.y + 3*font->fontHeight);
@@ -272,18 +272,14 @@ int main(int argc, char *args[]) {
         
         
         ////INIT FONTS
-        char *fontName = concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena);
-        Font mainFont = initFont(fontName, 88);
-        Font smallMainFont = initFont(fontName, 52);
+        // char *fontName = concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena);
+        // Font mainFont = initFont(fontName, 88);
+        // Font smallMainFont = initFont(fontName, 52);
         
-        easyFont_createSDFFont(concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena));
         
-        // exit(0);
-        char *fontName1 = concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena);
-        
-        //Set the debug font 
-        globalDebugFont = initFont(fontName1, 32);
-        ///
+        // easyFont_createSDFFont(concatInArena(globalExeBasePath, "/fonts/UbuntuMono-Regular.ttf", &globalPerFrameArena));    
+        EasyFont_Font mainFont = easyFont_loadFontAtlas(concatInArena(globalExeBasePath, "fontAtlas_mono-font_1", &globalPerFrameArena));   
+        globalDebugFont = mainFont;
         
         
         
@@ -346,7 +342,7 @@ int main(int argc, char *args[]) {
             renderSetViewPort(0, 0, resolution.x, resolution.y);
             
             /////////////// Write Code Here /////////////////////
-            Font *font = &smallMainFont;
+            EasyFont_Font *font = &mainFont;
 
 
             float aspectRatio = (float)spaceImage.height / (float)spaceImage.width;

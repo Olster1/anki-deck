@@ -4,9 +4,25 @@ of the image. It requires stb_image_write also easy_text_io, eas_lex & easy_arra
 and stretchy buffer respectively
 */
 
+typedef enum {
+	EASY_ATLAS_TEXTURE_ATLAS,
+	EASY_ATLAS_FONT_ATLAS,
+} EasyAtlas_AtlasType;
+
 typedef struct {
 	char *shortName;
+	char *longName;
+
+	union {
+		struct { //Fonts
+			s32 xOffset;
+			s32 yOffset;
+			s32 codepoint;
+			s32 fontHeight;
+		};
+	};
 	
+	//NOTE(ollie): Width, height & image data in this 
 	Texture tex;
 	bool added;
     
@@ -180,10 +196,9 @@ typedef struct {
 	Rect2f dimensions[128];
 } EasyAtlas_Dimensions;
 
-static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, InfiniteAlloc *atlasElms, bool outputImageFile, char *name, int EASY_ATLAS_PADDING, int sizeX, int sizeY) {
+static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *memoryArena, InfiniteAlloc *atlasElms, bool outputImageFile, char *name, int EASY_ATLAS_PADDING, int sizeX, int sizeY, EasyAtlas_AtlasType type) {
     
     EasyAtlas_Dimensions result = {};
-;
 
 	MemoryArenaMark tempMark = takeMemoryMark(memoryArena);
 	
@@ -237,7 +252,12 @@ static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *
 						result.dimensions[result.count - 1] = resultDim;
 
 						if(outputImageFile) {
-							renderTextureCentreDim(&texOnStack, v2ToV3(getCenter(texAsRect), NEAR_CLIP_PLANE), getDim(texAsRect), COLOR_WHITE, 0, mat4(), mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y));
+							Matrix4 flipMatrix = mat4();
+
+							if(type == EASY_ATLAS_FONT_ATLAS) {
+								flipMatrix = mat4TopLeftToBottomLeft(bufferDim.y);
+							}
+							renderTextureCentreDim(&texOnStack, v2ToV3(getCenter(texAsRect), NEAR_CLIP_PLANE), getDim(texAsRect), COLOR_WHITE, 0, flipMatrix, mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y));
 							// renderDrawRectOutlineCenterDim_(v2ToV3(getCenter(bin->rect), -0.5f), getDim(bin->rect), COLOR_RED, 0, mat4(), OrthoMatrixToScreen_BottomLeft(bufferDim.x, bufferDim.y), 4); 
 	                        
 							texOnStack.uvCoords = rect2f(texAsRect.minX / bufferDim.x, texAsRect.minY / bufferDim.y, texAsRect.maxX / bufferDim.x, texAsRect.maxY / bufferDim.y);
@@ -252,6 +272,15 @@ static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *
 						    addVar(&fileMemoryToWrite, &texOnStack.height, "height", VAR_INT);
 						    addVar(&fileMemoryToWrite, texOnStack.uvCoords.E, "uvCoords", VAR_V4);
 						    addVar(&fileMemoryToWrite, atlasElm->shortName, "name", VAR_CHAR_STAR);
+						    addVar(&fileMemoryToWrite, atlasElm->longName, "fullName", VAR_CHAR_STAR);
+
+						    //NOTE(ollie): Also add offets & codepoint for font atlases
+						    if(type == EASY_ATLAS_FONT_ATLAS) {
+								addVar(&fileMemoryToWrite, &atlasElm->xOffset, "xoffset", VAR_INT);
+								addVar(&fileMemoryToWrite, &atlasElm->yOffset, "yoffset", VAR_INT);						    	
+								addVar(&fileMemoryToWrite, &atlasElm->codepoint, "codepoint", VAR_INT);		
+								addVar(&fileMemoryToWrite, &atlasElm->fontHeight, "fontHeight", VAR_INT);						    	
+						    }
 	                        
 						    char *endBr = "}";
 						    addElementInifinteAllocWithCount_(&fileMemoryToWrite, endBr, 1); 
@@ -279,20 +308,38 @@ static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *
 			glFlush();
 			printf("%s\n", "successfullly rendered group");
 	        
-			char buffer[512] = {};
-			sprintf(buffer, "%s%s_%d.txt", folderName, name, loopCount);
-			printf("%s\n", buffer);
-			game_file_handle fileHandle = platformBeginFileWrite(buffer);
+	        //NOTE(ollie): Make sure the name fits in a buffer
+            char *formatString = "%s%s_%d.txt";
+            //NOTE(ollie): Get the string length
+			int stringLengthToAlloc = snprintf(0, 0, formatString, folderName, name, loopCount) + 1;
+			//NOTE(ollie): Pushe the array
+			char *strArray = pushArray(&globalPerFrameArena, stringLengthToAlloc, char);
+			//NOTE(ollie): Write the string into the buffer
+			snprintf(strArray, stringLengthToAlloc, formatString, folderName, name, loopCount);
+
+			////////////////////////////////////////////////////////////////////
+
+			//NOTE(ollie): Open or create the file
+			game_file_handle fileHandle = platformBeginFileWrite(strArray);
 	        
 			platformWriteFile(&fileHandle, fileMemoryToWrite.memory, fileMemoryToWrite.sizeOfMember*fileMemoryToWrite.count, 0);
 	        
 			platformEndFile(fileHandle);
 	        
 			printf("%s\n", "wrote file");
-            
-			char buffer1[512] = {};
-			sprintf(buffer1, "%s%s_%d.png", folderName, name, loopCount);
-			
+            	
+            //NOTE(ollie): Make sure the name fits in a buffer
+            formatString = "%s%s_%d.png";
+            //NOTE(ollie): Get the string length
+			stringLengthToAlloc = snprintf(0, 0, formatString, folderName, name, loopCount) + 1; //for null terminator
+			//NOTE(ollie): Pushe the array
+			strArray = pushArray(&globalPerFrameArena, stringLengthToAlloc, char);
+			//NOTE(ollie): Write the string into the buffer
+			snprintf(strArray, stringLengthToAlloc, formatString, folderName, name, loopCount);
+
+			////////////////////////////////////////////////////////////////////
+				
+			///////////////////////*********** Write the png file to disk **************////////////////////
 			size_t bytesPerPixel = 4;
 			size_t sizeToAlloc = bufferDim.x*bufferDim.y*bytesPerPixel;
 			int stride_in_bytes = bytesPerPixel*bufferDim.x;
@@ -307,9 +354,13 @@ static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *
                              pixelBuffer);
             
 			
-			int writeResult = stbi_write_png(buffer1, bufferDim.x, bufferDim.y, 4, pixelBuffer, stride_in_bytes);
-            
-			printf("%s\n", "wrote image");
+			int writeResult = stbi_write_png(strArray, bufferDim.x, bufferDim.y, 4, pixelBuffer, stride_in_bytes);
+            	
+            //NOTE(ollie): Notify user of progress
+            printf("%s\n", "wrote image");
+
+            ///////////////////////************* Cleanup ************////////////////////
+			
 			free(pixelBuffer);
 			deleteFrameBuffer(&atlasBuffer);
 		} 
@@ -320,7 +371,7 @@ static inline EasyAtlas_Dimensions easyAtlas_drawAtlas(char *folderName, Arena *
 	return result;
 }
 
-static inline void easyAtlas_loadTextureAtlas(char *fileName, RenderTextureFilter filter) {
+static inline void easyAtlas_loadTextureAtlas(char *fileName, RenderTextureFilter filter, EasyAtlas_AtlasType type) {
 	char buffer0[512] = {};
 	sprintf(buffer0, "%s.txt", fileName);
     
@@ -418,7 +469,7 @@ static inline void easyAtlas_createTextureAtlas(char *idName, char *folderName, 
 	easyAtlas_sortBySize(&atlasElms);
 	stbi_flip_vertically_on_write(true);//flip bytes vertically
     
-	easyAtlas_drawAtlas(ouputFolderName, memoryArena, &atlasElms, true, idName, padding, 4096, 4096);
+	easyAtlas_drawAtlas(ouputFolderName, memoryArena, &atlasElms, true, idName, padding, 4096, 4096, EASY_ATLAS_TEXTURE_ATLAS);
     
 	releaseInfiniteAlloc(&atlasElms);
     

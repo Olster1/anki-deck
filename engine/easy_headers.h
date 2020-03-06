@@ -68,7 +68,7 @@ static char* globalExeBasePath;
 #include "easy_editor.h"
 #include "easy_camera.h"
 #include "easy_tile.h"
-#include "easy_ui.h"
+// #include "easy_ui.h"
 #include "easy_console.h"
 #include "easy_flash_text.h"
 #include "easy_ast.h"
@@ -79,7 +79,7 @@ static char* globalExeBasePath;
 #include "easy_collision.h"
 #include "easy_physics.h"
 
-#include "easy_write.h"
+// #include "easy_write.h"
 #include "easy_profiler_draw.h"
 
 

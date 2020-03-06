@@ -2646,6 +2646,11 @@ void renderTextureCentreDim(Texture *texture, V3 center, V2 dim, V4 color, float
     renderDrawRectCenterDim_(center, dim, colors, rot, offsetTransform, texture, SHAPE_TEXTURE, &textureProgram, viewMatrix, projectionMatrix, 0);
 }
 
+static void renderGlyphCentreDim(Texture *texture, V3 center, V2 dim, V4 color, float rot, Matrix4 offsetTransform, Matrix4 viewMatrix, Matrix4 projectionMatrix) {
+    V4 colors[4] = {color, color, color, color}; 
+    renderDrawRectCenterDim_(center, dim, colors, rot, offsetTransform, texture, SHAPE_TEXTURE, &fontProgram, viewMatrix, projectionMatrix, 0);
+}
+
 void renderColorWheel(V3 center, V2 dim, EasyRender_ColorWheel_DataPacket *packet, Matrix4 offsetTransform, Matrix4 viewMatrix, Matrix4 projectionMatrix) {
     V4 colors[4]; 
     RenderItem * i = renderDrawRectCenterDim_(center, dim, colors, 0, offsetTransform, &globalWhiteTexture, SHAPE_COLOR_WHEEL, &colorWheelProgram, viewMatrix, projectionMatrix, packet);
